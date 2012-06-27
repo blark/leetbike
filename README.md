@@ -17,5 +17,5 @@ Programming
 pinout for avrisp mkii: http://www.equinox-tech.com/products/details.asp?ID=362#f622
 
 example:
-avrdude -c avrispmkII -t t84 -P usb -U flash:w:cylon.hex
+avrdude -c avrispmkII -p t84 -P usb -e -U flash:w:cylon.hex
 
