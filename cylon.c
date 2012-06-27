@@ -46,7 +46,7 @@ unsigned char max_bright = 254; // maximum brightness to go to is 254
 unsigned char start_bright = 84; // turn on the next led when we reach 1/3 of the max_bright of the previous one
 unsigned char compare[CHMAX] = {0};  // from ATMEL PWM code
 volatile unsigned char compbuff[CHMAX] = {0}; // pwm routine uses this to set the brightness - from ATMEL PWM code
-unsigned char led_bright[CHMAX] = {0}; // led brightness array holds current brightness for each led
+volatile unsigned char led_bright[CHMAX] = {0}; // led brightness array holds current brightness for each led
 signed char fade_inc = 2; // altering this value will increase/decrease fade speed
 signed char led_increment[CHMAX] = {2,0}; // if 0 fade is off, if positive fading up, if negative fading down
 bool reverse_leds = 0; // 0 means leds are going 0 -> CHMAX, 1 means leds are going CHMAX -> 0.
@@ -108,7 +108,8 @@ int main(void)
 			
 			// brightness values get sent off to the PWM routine 
 			// still need to learn how that works
-			compbuff[i] = led_bright[i];
+			// compbuff[i] = led_bright[i]; 
+            // this code can be deleted if the program still works ;)
 		}			
 
 		// if this delay isn't here the leds race across so fast you can hardly see the fade.
@@ -156,7 +157,7 @@ ISR (TIM0_OVF_vect)
         LED_PORT = pin_level; // update outputs
         if(++softcount == 0)  // increment modulo 256 counter and update the compare values only when counter = 0.
         {        
-                memcpy(compare, compbuff, CHMAX*sizeof(int));
+                memcpy(compare, led_bright, CHMAX*sizeof(int)); // if this works, delete the compbuff array, it's no longer used.
                 //compare[0] = compbuff[0];   // verbose code for speed
                 //compare[1] = compbuff[1];
                 //compare[2] = compbuff[2];
