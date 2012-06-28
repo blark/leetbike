@@ -40,7 +40,7 @@
 #define LED_DDR DDRA
 
 void delay_ms(uint16_t ms);
-void init();
+void init(void);
 
 unsigned char max_bright = 254; // maximum brightness to go to is 254
 unsigned char start_bright = 84; // turn on the next led when we reach 1/3 of the max_bright of the previous one
@@ -71,11 +71,11 @@ int main(void)
 			// and it's fading in, two if statements one for each direction.
 			if ((led_bright[i] == start_bright) && (led_increment[i] > 0) && (reverse_leds==0))
 			{
-				led_increment[(i+1)] = fade_inc;
+				led_increment[i+1] = fade_inc;
 			}
 			if ((led_bright[i] == start_bright) && (led_increment[i] > 0) && (reverse_leds)) 
 			{
-				led_increment[(i-1)] = fade_inc;
+				led_increment[i-1] = fade_inc;
 			}
 
 			// if the current led brightness is 0 and the fade_inc is a negative then the led cycle
@@ -104,9 +104,7 @@ int main(void)
 
 			// this is where the led_increment actually gets added 
 			led_bright[i] += led_increment[i];
-			
 		}			
-
 		// if this delay isn't here the leds race across so fast you can hardly see the fade.
 		delay_ms(FADEDEL); 
 	}
@@ -114,11 +112,11 @@ int main(void)
  
 void delay_ms(uint16_t ms)
 {
-        while (ms)
-        {
-                _delay_ms(1);
-                ms--;
-        }
+    while (ms)
+    {
+        _delay_ms(1);
+        ms--;
+    }
 }
  
 void init(void)
@@ -145,8 +143,6 @@ ISR (TIM0_OVF_vect)
         LED_PORT = pin_level; // update outputs
         if(++softcount == 0)  // increment modulo 256 counter and update the compare values only when counter = 0.
         {        
-                // old code used to manually assign compare[x] to led_bright[x], and led_bright was voliatile.. 
-                // but it seems to work this way too. not sure if this is smart or dumb.
                 memcpy(compare, led_bright, CHMAX*sizeof(int)); // copies contents of led_bright array to compare
                 pin_level = PORT_MASK;     // set all port pins high
         }

@@ -11,6 +11,7 @@ TARGET = main
 SRC = 
 ASRC = /home/blark/avr/leetbike/cylon.c
 OPT = s
+F_CPU = 1000000UL
 
 # Name of this Makefile (used for "make depend").
 MAKEFILE = Makefile
@@ -28,7 +29,7 @@ DEBUG = stabs
 CSTANDARD = -std=gnu99
 
 # Place -D or -U options here
-CDEFS =
+CDEFS = -DF_CPU=$(F_CPU)
 
 # Place -I options here
 CINCS =
