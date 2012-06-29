@@ -43,7 +43,7 @@
 void delay_ms(uint16_t ms);
 void init(void);
 
-volatile unsigned char led_bright[CHMAX] = {0}; // led brightness array holds current brightness for each led (volatile?)
+volatile unsigned char led_bright[CHMAX] = {0}; // led brightness array holds current brightness for each LED 
 unsigned char compare[CHMAX] = {0};  // from ATMEL PWM code
 
 int main(void)
@@ -51,9 +51,9 @@ int main(void)
     enum {cylon, slowblink, fastblink, on, zzz} led_mode = cylon;
     unsigned char max_bright = 254; // maximum brightness to go to is 254 (must be divisable by fade_inc or you'll break shit)
     unsigned char start_bright = 84; // turn on the next led when we reach 1/3 of the max_bright of the previous one
-    signed char fade_inc = 2; // altering this value will increase/decrease fade speed (see max_bright comment)
-    signed char led_increment[CHMAX] = {2,0}; // if 0 fade is off, if positive fading up, if negative fading down
-    bool reverse_leds = 0; // 0 means leds are going 0 -> CHMAX, 1 means leds are going CHMAX -> 0.
+    signed char fade_inc = 2; // altering this value will increase/decrease brightness increment (see max_bright comment)
+    signed char led_increment[CHMAX] = {2,0}; // if 0 fade is off, fade_inc if fading up, negative fade_inc if fading down
+    bool reverse_leds = 0; // 0 means leds are going 0 -> CHMAX, 1 means leds are going  0 <- CHMAX.
     
     init();	
 	
@@ -72,7 +72,7 @@ int main(void)
 		        	}
 		        	// the next led should start fading if the current one has reached start_bright
 		        	// while it's fading in, also make sure we aren't at the first or last LED.
-		        	if ((led_bright[i] == start_bright) && (led_increment[i] > 0)) {
+		        	if ((led_bright[i] >= start_bright) && (led_increment[i] > 0)) {
                         if (i < CHMAX-1 && (reverse_leds==0)) { 
                            led_increment[i+1] = fade_inc;
                         }
@@ -86,22 +86,19 @@ int main(void)
                         // set led_increment to 0 to turn led updates off
 		        		led_increment[i] = 0;
 		        		// if we're at the last led, reverse the fade
-                        // note: we could also test if led_increment is all 0s? 
 		        		if((i == (CHMAX-1)) && (reverse_leds==0)) {
 		        			reverse_leds=1;
-                            // led_increment[CHMAX]={0}; // turn off everything first, for debugging
 		        			led_increment[CHMAX-1]=fade_inc; // set the last led to start
 		        			delay_ms(CYCLEDEL);	  
 		        		}
 		        		// if we're at the first led, reverse the fade
 		        		if ((i == 0) && (reverse_leds))	{
 		        			reverse_leds=0; 
-                            // led_increment[CHMAX]={0}; // turn off everything first, for debugging
 		        			led_increment[0]=fade_inc; // sets the first led to start 
 		        			delay_ms(CYCLEDEL);
 		        		}
 		        	}
-		        	// this is where the led_increment actually gets added 
+		        	// finally add the led_incrememnt value 
 		        	led_bright[i] += led_increment[i];
 		        }			
 		        // if this delay isn't here the leds race across so fast you can hardly see the fade.
