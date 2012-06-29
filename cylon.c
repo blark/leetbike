@@ -1,6 +1,8 @@
 /*
  * Author: Blark - blark at pwnp.al
  *  - some of this code is ripped from Atmel's software PWM example
+ *  - thanks to larryvc and the others on avrfreaks for the help 
+ *  - #define F_CPU 8000000UL is in Makefile - if you aren't using one, it should be used with the correct clock speed
  */
  
 #include <avr/io.h>
@@ -29,8 +31,7 @@
 #define LED5_CLEAR (pin_level &= ~(1 << LED5))
 #define LED6_CLEAR (pin_level &= ~(1 << LED6))
  
-// Set bits corresponding to pin usage above
-#define PORT_MASK  (1 << PA0)|(1 << PA1)|(1 << PA2)|(1 << PA3)|(1 << PA4)|(1 << PA5)|(1 << PA6)
+#define PORT_MASK 0x7F; // Set bits corresponding to pin usage above
  
 #define set(x) |= (1<<x)
 #define clr(x) &=~(1<<x)
@@ -42,84 +43,96 @@
 void delay_ms(uint16_t ms);
 void init(void);
 
-unsigned char max_bright = 254; // maximum brightness to go to is 254
-unsigned char start_bright = 84; // turn on the next led when we reach 1/3 of the max_bright of the previous one
+volatile unsigned char led_bright[CHMAX] = {0}; // led brightness array holds current brightness for each led (volatile?)
 unsigned char compare[CHMAX] = {0};  // from ATMEL PWM code
-unsigned char led_bright[CHMAX] = {0}; // led brightness array holds current brightness for each led (volatile?)
-signed char fade_inc = 2; // altering this value will increase/decrease fade speed
-signed char led_increment[CHMAX] = {2,0}; // if 0 fade is off, if positive fading up, if negative fading down
-bool reverse_leds = 0; // 0 means leds are going 0 -> CHMAX, 1 means leds are going CHMAX -> 0.
-
-char wtf = 1; //if you delete this the program stops working... WTF!?
 
 int main(void)
 {
+    enum {cylon, slowblink, fastblink, on, zzz} led_mode = cylon;
+    unsigned char max_bright = 254; // maximum brightness to go to is 254 (must be divisable by fade_inc or you'll break shit)
+    unsigned char start_bright = 84; // turn on the next led when we reach 1/3 of the max_bright of the previous one
+    signed char fade_inc = 2; // altering this value will increase/decrease fade speed (see max_bright comment)
+    signed char led_increment[CHMAX] = {2,0}; // if 0 fade is off, if positive fading up, if negative fading down
+    bool reverse_leds = 0; // 0 means leds are going 0 -> CHMAX, 1 means leds are going CHMAX -> 0.
+    
     init();	
-	while(1)
-	{ 
-		unsigned char i;
-		for(i=0; i<CHMAX; i++)
-		{
-			// check if the led has reached max_bright
-			// if it has, change the fade_inc to negative so it goes back down.
-			if (led_bright[i] == max_bright) 
-			{ 
-				led_increment[i] = -led_increment[i];
-			}
-			
-			// the next led should start fading if the current one has reached the start_bright threshold
-			// and it's fading in, two if statements one for each direction.
-			if ((led_bright[i] == start_bright) && (led_increment[i] > 0) && (reverse_leds==0))
-			{
-				led_increment[i+1] = fade_inc;
-			}
-			if ((led_bright[i] == start_bright) && (led_increment[i] > 0) && (reverse_leds)) 
-			{
-				led_increment[i-1] = fade_inc;
-			}
+	
+    while(1)
+    { 
+		switch (led_mode) {
+            
+            unsigned char i;
+            
+            case cylon: 
+		        for (i=0; i<CHMAX; i++) {
+		        	// check if the led has reached max_bright
+		        	// change the fade_inc to negative so it begins to fade.
+		        	if (led_bright[i] == max_bright) { 
+		        		led_increment[i] = -fade_inc;
+		        	}
+		        	// the next led should start fading if the current one has reached start_bright
+		        	// while it's fading in, also make sure we aren't at the first or last LED.
+		        	if ((led_bright[i] == start_bright) && (led_increment[i] > 0)) {
+                        if (i < CHMAX-1 && (reverse_leds==0)) { 
+                           led_increment[i+1] = fade_inc;
+                        }
+                        if ((i > 0) && (reverse_leds)) { 
+                            led_increment[i-1] = fade_inc;
+                          }
+		        	}
+		        	// if the current led brightness is 0 and the fade_inc is a negative then the led cycle
+		        	// is complete - we need to turn it off.
+		        	if((led_bright[i] == 0) && (led_increment[i] < 0)) {
+                        // set led_increment to 0 to turn led updates off
+		        		led_increment[i] = 0;
+		        		// if we're at the last led, reverse the fade
+                        // note: we could also test if led_increment is all 0s? 
+		        		if((i == (CHMAX-1)) && (reverse_leds==0)) {
+		        			reverse_leds=1;
+                            // led_increment[CHMAX]={0}; // turn off everything first, for debugging
+		        			led_increment[CHMAX-1]=fade_inc; // set the last led to start
+		        			delay_ms(CYCLEDEL);	  
+		        		}
+		        		// if we're at the first led, reverse the fade
+		        		if ((i == 0) && (reverse_leds))	{
+		        			reverse_leds=0; 
+                            // led_increment[CHMAX]={0}; // turn off everything first, for debugging
+		        			led_increment[0]=fade_inc; // sets the first led to start 
+		        			delay_ms(CYCLEDEL);
+		        		}
+		        	}
+		        	// this is where the led_increment actually gets added 
+		        	led_bright[i] += led_increment[i];
+		        }			
+		        // if this delay isn't here the leds race across so fast you can hardly see the fade.
+		        delay_ms(FADEDEL);
+                break;
 
-			// if the current led brightness is 0 and the fade_inc is a negative then the led cycle
-			// is complete - we need to turn it off.
-			if((led_bright[i] == 0) && (led_increment[i] < 0))
-			{
-				// set led_increment to 0 to turn led updates off
-				led_increment[i] = 0;
+            case slowblink:
+                break;
 
-				// if we're at the last led, reverse the fade
-				if((i == (CHMAX-1)) && (reverse_leds==0))
-				{
-					reverse_leds=1;
-					led_increment[CHMAX-1]=fade_inc; // set the last led to start
-					delay_ms(CYCLEDEL);	  
-				}
-				
-				// if we're at the first led, reverse the fade
-				if ((i == 0) && (reverse_leds))
-				{
-					reverse_leds=0; 
-					led_increment[0]=fade_inc; // sets the first led to start 
-					delay_ms(CYCLEDEL);
-				}
-			}
+            case fastblink:
+                break;
 
-			// this is where the led_increment actually gets added 
-			led_bright[i] += led_increment[i];
-		}			
-		// if this delay isn't here the leds race across so fast you can hardly see the fade.
-		delay_ms(FADEDEL); 
+            case on:
+                break;
+
+            case zzz:
+                break;
+        }
+
 	}
 }
  
-void delay_ms(uint16_t ms)
+void delay_ms(uint16_t ms) 
 {
-    while (ms)
-    {
+    while (ms) {
         _delay_ms(1);
         ms--;
     }
 }
  
-void init(void)
+void init(void) 
 {
     LED_DDR set(LED0);      // set the direction of the ports
 	LED_DDR set(LED1);
@@ -136,15 +149,20 @@ void init(void)
     sei();
 }
  
-ISR (TIM0_OVF_vect)
+ISR (TIM0_OVF_vect) 
 {
         static unsigned char pin_level=PORT_MASK;
         static unsigned char softcount=0xFF;
         LED_PORT = pin_level; // update outputs
-        if(++softcount == 0)  // increment modulo 256 counter and update the compare values only when counter = 0.
-        {        
-                memcpy(compare, led_bright, CHMAX*sizeof(int)); // copies contents of led_bright array to compare
-                pin_level = PORT_MASK;     // set all port pins high
+        if(++softcount == 0) { // increment modulo 256 counter and update the compare values only when counter = 0.
+            compare[0] = led_bright[0];   // verbose code for speed 
+            compare[1] = led_bright[1]; 
+            compare[2] = led_bright[2]; 
+            compare[3] = led_bright[3]; 
+            compare[4] = led_bright[4]; 
+            compare[5] = led_bright[5]; 
+            compare[6] = led_bright[6];    
+            pin_level = PORT_MASK;     // set all port pins high
         }
 
         // clear port pin on compare match (executed on next interrupt)
